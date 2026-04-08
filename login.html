@@ -275,7 +275,13 @@ window.opretKonto = async function() {
   if (!navn || !email || !password) { showMsg(msg, 'Udfyld alle felter', 'error'); return }
   if (password.length < 6)          { showMsg(msg, 'Kodeord skal være min. 6 tegn', 'error'); return }
 
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  const { data, error } = await supabase.auth.signUp({ 
+  email, 
+  password,
+  options: {
+    data: { navn }  // ← sender navn med til triggeren
+  }
+})
 
   if (error) { showMsg(msg, error.message, 'error'); return }
 
