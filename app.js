@@ -160,26 +160,31 @@ async function loadSpillere() {
   }
 
   tbody.innerHTML = data.map(s => `
-    <tr>
-      <td><strong>${s.navn}</strong></td>
-      <td>
-        <span class="badge ${s.medlem ? 'badge-green' : 'badge-dim'}">
-          ${s.medlem ? 'MEDLEM' : 'IKKE-MEDLEM'}
-        </span>
-      </td>
-      <td>
-        <span class="badge ${s.tilmeldt ? 'badge-green' : 'badge-dim'}">
-          ${s.tilmeldt ? 'TILMELDT' : 'IKKE TILMELDT'}
-        </span>
-      </td>
-      <td>
-        <button class="btn btn-sm" onclick="toggleTilmeldt(${s.id}, ${s.tilmeldt})">
-          ${s.tilmeldt ? 'Frameld' : 'Tilmeld'}
-        </button>
-        <button class="btn btn-sm btn-danger" onclick="deleteSpiller(${s.id})">Slet</button>
-      </td>
-    </tr>
-  `).join('')
+  <tr>
+    <td><strong>${s.navn}</strong></td>
+    <td>
+      <span class="badge ${s.medlem ? 'badge-green' : 'badge-dim'}">
+        ${s.medlem ? 'MEDLEM' : 'IKKE-MEDLEM'}
+      </span>
+      ${s.ansøgt && !s.medlem ? '<span class="badge badge-red" style="margin-left:6px">ANSØGT</span>' : ''}
+    </td>
+    <td>
+      <span class="badge ${s.tilmeldt ? 'badge-green' : 'badge-dim'}">
+        ${s.tilmeldt ? 'TILMELDT' : 'IKKE TILMELDT'}
+      </span>
+    </td>
+    <td>
+      ${s.ansøgt && !s.medlem
+        ? `<button class="btn btn-sm" onclick="godkendMedlem(${s.id})">Godkend</button>`
+        : ''
+      }
+      <button class="btn btn-sm" onclick="toggleTilmeldt(${s.id}, ${s.tilmeldt})">
+        ${s.tilmeldt ? 'Frameld' : 'Tilmeld'}
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="deleteSpiller(${s.id})">Slet</button>
+    </td>
+  </tr>
+`).join('')
 }
 
 window.gemSpiller = async function() {
@@ -201,6 +206,16 @@ window.toggleTilmeldt = async function(id, nuværende) {
   const { error } = await supabase.from('spillere').update({ tilmeldt: !nuværende }).eq('id', id)
   if (error) { toast('FEJL: ' + error.message); return }
   toast(nuværende ? '✓ FRAMELDT' : '✓ TILMELDT')
+  loadSpillere()
+}
+
+window.godkendMedlem = async function(id) {
+  const { error } = await supabase
+    .from('spillere')
+    .update({ medlem: true, ansøgt: false })
+    .eq('id', id)
+  if (error) { toast('FEJL: ' + error.message); return }
+  toast('✓ MEDLEMSKAB GODKENDT')
   loadSpillere()
 }
 

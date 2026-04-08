@@ -307,7 +307,9 @@
   <button class="btn" style="padding:6px 14px;font-size:0.7rem" onclick="logUd()">Log ud</button>
 </nav>
 
-<div class="tabs">
+<div class="tabs"> <div style="position:relative;z-index:1;padding:1rem 2rem;border-bottom:1px solid var(--border)">
+  <div id="medlemskab-status"></div>
+</div>
   <button class="tab active" onclick="skiftTab('events', this)">Events</button>
   <button class="tab" onclick="skiftTab('udstyr', this)">Lej Udstyr</button>
 </div>
@@ -522,9 +524,46 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500)
 }
 
+async function checkMedlemskab() {
+  const { data } = await supabase
+    .from('spillere')
+    .select('medlem, ansøgt')
+    .ilike('navn', aktivtNavn)
+    .single()
+
+  const container = document.getElementById('medlemskab-status')
+  if (!container) return
+
+  if (data?.medlem) {
+    container.innerHTML = '<span class="badge badge-green">✓ DU ER MEDLEM</span>'
+  } else if (data?.ansøgt) {
+    container.innerHTML = '<span class="badge badge-dim">ANSØGNING AFVENTER GODKENDELSE</span>'
+  } else {
+    container.innerHTML = '<button class="btn" onclick="ansøgMedlemskab()">Ansøg om medlemskab</button>'
+  }
+}
+
+window.ansøgMedlemskab = async function() {
+  const { data: existing } = await supabase
+    .from('spillere')
+    .select('id')
+    .ilike('navn', aktivtNavn)
+    .single()
+
+  if (existing) {
+    await supabase.from('spillere').update({ ansøgt: true }).eq('id', existing.id)
+  } else {
+    await supabase.from('spillere').insert({ navn: aktivtNavn, medlem: false, tilmeldt: false, ansøgt: true })
+  }
+
+  toast('✓ ANSØGNING SENDT')
+  checkMedlemskab()
+}
+
 // ── INIT ───────────────────────────────────────────────
 loadEvents()
 loadUdstyr()
+checkMedlemskab()
 </script>
 </body>
 </html>
