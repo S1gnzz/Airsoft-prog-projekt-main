@@ -395,7 +395,7 @@ window.justerAntal = async function(id, antalLejet, nuværendeAntal, retning) {
 // Udlej ét styk
 window.udlejEt = async function(id, antalLejet, samlet) {
   if (antalLejet >= samlet) { toast('FEJL: Ingen ledige tilbage'); return }
-  const { error } = await supabase.from('udstyr').update({ antal_lejet: antalLejet + 1, lejet_af: (profil?.navn || session.user.email) }).eq('id', id)
+  const { error } = await supabase.from('udstyr').update({ antal_lejet: antalLejet + 1 }).eq('id', id)
   if (error) { toast('FEJL: ' + error.message); return }
   toast('✓ UDLEJET')
   loadUdstyr()
@@ -483,39 +483,61 @@ loadUdstyr()
 //  inkl. hvem der har lejet det. Admin kan returnere herfra.
 // ══════════════════════════════════════════════════════
 async function loadUdlejninger() {
+  // Hent alle rækker fra udlejninger-tabellen — én række per person per udstyr
   const { data, error } = await supabase
-    .from('udstyr')
+    .from('udlejninger')
     .select('*')
-    .gt('antal_lejet', 0)  // kun udstyr hvor mindst 1 er lejet ud
-    .order('navn')
+    .order('dato', { ascending: false })
 
   if (error) { console.error(error); return }
 
   const tbody = document.getElementById('udlejninger-body')
 
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">INTET UDSTYR ER AKTUELT LEJET UD</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">INTET UDSTYR ER AKTUELT LEJET UD</td></tr>'
     return
   }
 
-  tbody.innerHTML = data.map(u => `
-    <tr>
-      <td><strong>${u.navn}</strong></td>
-      <td><span class="badge badge-dim">${u.type || '—'}</span></td>
-      <td>${u.lejet_af || '—'}</td>
-      <td>
-        <span class="badge badge-red">${u.antal_lejet} lejet ud</span>
-      </td>
-      <td>
-        <span class="badge ${u.tilstand === 'Defekt' ? 'badge-red' : u.tilstand === 'God' ? 'badge-green' : 'badge-dim'}">
-          ${u.tilstand || '—'}
-        </span>
-      </td>
-      <td>
-        <button class="btn btn-sm" onclick="returnerEt(${u.id}, ${u.antal_lejet}); loadUdlejninger()">
-          Returner én
-        </button>
-      </td>
-    </tr>
-  `).join('')
+  tbody.innerHTML = data.map(l => {
+    const dato = new Date(l.dato).toLocaleDateString('da-DK', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    return `
+      <tr>
+        <td><strong>${l.udstyr_navn}</strong></td>
+        <td><span class="badge badge-red">LEJET UD</span></td>
+        <td>${l.bruger_navn || '—'}</td>
+        <td style="font-size:0.78rem; color:var(--text-dim)">${dato}</td>
+        <td>
+          <button class="btn btn-sm" onclick="adminReturner(${l.udstyr_id}, ${l.id})">
+            Returner
+          </button>
+        </td>
+      </tr>
+    `
+  }).join('')
+}
+
+// Admin returnerer udstyr på vegne af en bruger
+window.adminReturner = async function(udstyrId, udlejningId) {
+  // Hent nuværende antal_lejet
+  const { data: udstyr } = await supabase
+    .from('udstyr')
+    .select('antal_lejet')
+    .eq('id', udstyrId)
+    .single()
+
+  // Sænk antal_lejet med 1
+  await supabase
+    .from('udstyr')
+    .update({ antal_lejet: Math.max(0, (udstyr?.antal_lejet || 1) - 1) })
+    .eq('id', udstyrId)
+
+  // Slet lejemålet fra udlejninger-tabellen
+  await supabase.from('udlejninger').delete().eq('id', udlejningId)
+
+  toast('✓ RETURNERET')
+  loadUdlejninger()
+  loadUdstyr()
 }

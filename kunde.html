@@ -312,6 +312,7 @@
 </div>
   <button class="tab active" onclick="skiftTab('events', this)">Events</button>
   <button class="tab" onclick="skiftTab('udstyr', this)">Lej Udstyr</button>
+  <button class="tab" onclick="skiftTab('mine-udlejninger', this)">Mine Udlejninger</button>
 </div>
 
 <main>
@@ -323,6 +324,16 @@
     </div>
     <div class="cards" id="kunde-events-list">
       <div class="empty">LOADER EVENTS...</div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-mine-udlejninger">
+    <div class="section-title" style="margin-top:0.5rem">
+      <span>// DINE UDLEJNINGER</span>
+      Mine Udlejninger
+    </div>
+    <div id="mine-udlejninger-list">
+      <div class="empty">LOADER DINE LEJEMÅL...</div>
     </div>
   </div>
 
@@ -502,6 +513,7 @@ async function loadUdstyr() {
 }
 
 window.lejUdstyr = async function(id, navn, antalLejet) {
+  // Øg antal_lejet på udstyret
   const { error } = await supabase
     .from('udstyr')
     .update({ antal_lejet: antalLejet + 1 })
@@ -509,11 +521,85 @@ window.lejUdstyr = async function(id, navn, antalLejet) {
 
   if (error) { toast('FEJL: ' + error.message); return }
 
+  // Opret en række i udlejninger så vi ved hvem der har lejet hvad
+  await supabase.from('udlejninger').insert({
+    bruger_id:   session.user.id,
+    bruger_navn: aktivtNavn,
+    udstyr_id:   id,
+    udstyr_navn: navn
+  })
+
   visKvittering(
     'UDSTYR LEJET!',
     `Navn: <span class="kvittering-name">${aktivtNavn}</span><br>Udstyr: <span class="kvittering-name">${navn}</span><br><br>Vis dette til personalet ved afhentning.`
   )
 
+  loadUdstyr()
+  loadMineUdlejninger()
+}
+
+// Henter og viser brugerens egne lejemål fra udlejninger-tabellen
+async function loadMineUdlejninger() {
+  const { data, error } = await supabase
+    .from('udlejninger')
+    .select('*')
+    .eq('bruger_id', session.user.id)  // kun denne brugers lejemål
+    .order('dato', { ascending: false })
+
+  if (error) { console.error(error); return }
+
+  const container = document.getElementById('mine-udlejninger-list')
+
+  if (!data.length) {
+    container.innerHTML = '<div class="empty">DU HAR INGEN AKTIVE LEJEMÅL</div>'
+    return
+  }
+
+  container.innerHTML = data.map(l => {
+    // Formater dato til dansk format
+    const dato = new Date(l.dato).toLocaleDateString('da-DK', {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+
+    return `
+      <div class="card">
+        <div class="card-label">// LEJET UDSTYR</div>
+        <div class="card-title">${l.udstyr_navn}</div>
+        <div class="card-meta">📅 Lejet: ${dato}</div>
+        <div class="card-footer">
+          <span class="badge badge-red">UDLEJET</span>
+          <button class="btn" onclick="afleverUdstyr(${l.udstyr_id}, ${l.id})">
+            Aflever
+          </button>
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
+// Kunden afleverer udstyr — sletter lejemålet og sænker antal_lejet
+window.afleverUdstyr = async function(udstyrId, udlejningId) {
+  if (!confirm('Bekræft aflevering af udstyr?')) return
+
+  // Hent nuværende antal_lejet
+  const { data: udstyr } = await supabase
+    .from('udstyr')
+    .select('antal_lejet')
+    .eq('id', udstyrId)
+    .single()
+
+  // Sænk antal_lejet med 1
+  await supabase
+    .from('udstyr')
+    .update({ antal_lejet: Math.max(0, (udstyr?.antal_lejet || 1) - 1) })
+    .eq('id', udstyrId)
+
+  // Slet lejemålet fra udlejninger-tabellen
+  await supabase.from('udlejninger').delete().eq('id', udlejningId)
+
+  toast('✓ UDSTYR AFLEVERET')
+  loadMineUdlejninger()
   loadUdstyr()
 }
 
@@ -575,6 +661,7 @@ window.ansøgMedlemskab = async function() {
 // ── INIT ───────────────────────────────────────────────
 loadEvents()
 loadUdstyr()
+loadMineUdlejninger()
 checkMedlemskab()
 </script>
 </body>
