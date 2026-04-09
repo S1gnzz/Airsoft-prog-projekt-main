@@ -73,99 +73,7 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500)
 }
 
-<<<<<<< HEAD
 // EVENTS
-=======
-// ══════════════════════════════════════════════════════
-//  LOKALE ARRAYS — data gemmes her efter hentning fra databasen.
-//  Søgning, filtrering og statistik arbejder på disse arrays
-//  uden at lave nye database-kald hver gang.
-// ══════════════════════════════════════════════════════
-let alleEvents   = []
-let alleSpillere = []
-let alleUdstyr   = []
-
-// ══════════════════════════════════════════════════════
-//  STATISTIK
-//
-//  Udregner nøgletal fra de lokale arrays og opdaterer
-//  dashboard-boksene. Kører automatisk efter hvert load.
-// ══════════════════════════════════════════════════════
-function opdaterStatistik() {
-  // ── Events: tæl kun fremtidige events ──
-  const idag = new Date()
-  idag.setHours(0, 0, 0, 0)
-  const kommendeEvents = alleEvents.filter(ev => new Date(ev.dato) >= idag)
-  document.getElementById('stat-events').textContent = kommendeEvents.length
-
-  // ── Spillere: vis antal + procent der er medlemmer ──
-  const antalSpillere  = alleSpillere.length
-  const antalMedlemmer = alleSpillere.filter(s => s.medlem === true).length
-  document.getElementById('stat-spillere').textContent = antalSpillere
-
-  const statSpillereSub = document.getElementById('stat-spillere-sub')
-  if (statSpillereSub) {
-    const pct = antalSpillere > 0 ? Math.round((antalMedlemmer / antalSpillere) * 100) : 0
-    statSpillereSub.textContent = antalMedlemmer + ' medlemmer (' + pct + '%)'
-  }
-
-  // ── Udstyr: tilgængeligt = samlet antal minus udlejet ──
-  const samletAntal  = alleUdstyr.reduce((sum, u) => sum + (u.antal || 1), 0)
-  const samletLejet  = alleUdstyr.reduce((sum, u) => sum + (u.antal_lejet || 0), 0)
-  const tilgængeligt = samletAntal - samletLejet
-  document.getElementById('stat-udstyr').textContent = tilgængeligt
-
-  const statUdstyrSub = document.getElementById('stat-udstyr-sub')
-  if (statUdstyrSub) {
-    statUdstyrSub.textContent = samletLejet + ' lejet ud · ' + samletAntal + ' i alt'
-  }
-}
-
-// ══════════════════════════════════════════════════════
-//  SØGNING & FILTRERING
-// ══════════════════════════════════════════════════════
-function filterEvents(søgeTekst) {
-  const tekst = søgeTekst.toLowerCase()
-  const filtrerede = alleEvents.filter(ev =>
-    (ev.titel    || '').toLowerCase().includes(tekst) ||
-    (ev.lokation || '').toLowerCase().includes(tekst) ||
-    (ev.bane     || '').toLowerCase().includes(tekst)
-  )
-  renderEvents(filtrerede)
-}
-
-function filterSpillere() {
-  const tekst  = document.getElementById('spillere-søg').value.toLowerCase()
-  const status = document.getElementById('spillere-filter').value
-  const filtrerede = alleSpillere.filter(s => {
-    const navnMatcher  = (s.navn || '').toLowerCase().includes(tekst)
-    let statusMatcher  = true
-    if (status === 'medlem')      statusMatcher = s.medlem === true
-    if (status === 'ikke-medlem') statusMatcher = s.medlem === false
-    return navnMatcher && statusMatcher
-  })
-  renderSpillere(filtrerede)
-}
-
-function filterUdstyr() {
-  const tekst = document.getElementById('udstyr-søg').value.toLowerCase()
-  const type  = document.getElementById('udstyr-filter').value
-  const filtrerede = alleUdstyr.filter(u => {
-    const navnMatcher = (u.navn || '').toLowerCase().includes(tekst)
-    const typeMatcher = type === 'alle' || u.type === type
-    return navnMatcher && typeMatcher
-  })
-  renderUdstyr(filtrerede)
-}
-
-window.filterEvents   = filterEvents
-window.filterSpillere = filterSpillere
-window.filterUdstyr   = filterUdstyr
-
-// ══════════════════════════════════════════════════════
-//  EVENTS
-// ══════════════════════════════════════════════════════
->>>>>>> 67456c50a9a5fe2f65a3a189b3da8c081977de60
 async function loadEvents() {
   const { data, error } = await supabase.from('events').select('*').order('dato')
   if (error) { console.error(error); return }
@@ -321,14 +229,6 @@ window.deleteSpiller = async function(id) {
 }
 
 //  UDSTYR
-<<<<<<< HEAD
-=======
-//
-//  Hvert udstyr har et samlet antal og antal_lejet.
-//  Tilgængeligt = antal - antal_lejet
-//  Admin justerer antal med + og − knapper direkte i tabellen.
-// ══════════════════════════════════════════════════════
->>>>>>> 67456c50a9a5fe2f65a3a189b3da8c081977de60
 async function loadUdstyr() {
   const { data, error } = await supabase.from('udstyr').select('*').order('navn')
   if (error) { console.error(error); return }
@@ -473,17 +373,7 @@ window.gørAdmin = async function(id) {
   loadBrugere()
 }
 
-// ── INIT ───────────────────────────────────────────────
-loadEvents()
-loadSpillere()
-loadUdstyr()
-
-// ══════════════════════════════════════════════════════
-//  UDLEJNINGER
-//
-//  Viser en oversigt over alt udstyr der aktuelt er lejet ud,
-//  inkl. hvem der har lejet det. Admin kan returnere herfra.
-// ══════════════════════════════════════════════════════
+// UDLEJNINGER
 async function loadUdlejninger() {
   const { data, error } = await supabase
     .from('udstyr')
@@ -521,3 +411,9 @@ async function loadUdlejninger() {
     </tr>
   `).join('')
 }
+
+// ── INIT ───────────────────────────────────────────────
+loadEvents()
+loadSpillere()
+loadUdstyr()
+
