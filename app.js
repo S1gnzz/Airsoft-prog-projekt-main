@@ -1,11 +1,11 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-// ── CONFIG ─────────────────────────────────────────────
+// CONFIG
 const SUPABASE_URL = 'https://tndnbeuzulxbsiyrwtea.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_Temis8liudKBnUVCoifUCA_nVRNmNDs'
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// ── AUTH GUARD ─────────────────────────────────────────
+// AUTH GUARD
 const { data: { session } } = await supabase.auth.getSession()
 if (!session) {
   window.location.href = 'login.html'
@@ -28,7 +28,7 @@ window.logUd = async function() {
   window.location.href = 'login.html'
 }
 
-// ── BANE SUGGESTION ────────────────────────────────────
+// BANE
 const baneRegler = [
   { max: 10,   navn: 'CQB — Tæt Kamp',   desc: '1-10 spillere · Lille indendørs/skovbane med tæt kamp' },
   { max: 20,   navn: 'Blandet Terræn',    desc: '11-20 spillere · Mellem bane med åbne og lukkede zoner' },
@@ -49,7 +49,7 @@ window.suggestBane = function(antal) {
   box.classList.add('visible')
 }
 
-// ── NAVIGATION ─────────────────────────────────────────
+// NAVIGATION
 document.querySelectorAll('nav a[data-page]').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault()
@@ -76,9 +76,7 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500)
 }
 
-// ══════════════════════════════════════════════════════
-//  EVENTS
-// ══════════════════════════════════════════════════════
+// EVENTS
 async function loadEvents() {
   const { data, error } = await supabase.from('events').select('*').order('dato')
   if (error) { console.error(error); return }
@@ -144,9 +142,7 @@ window.deleteEvent = async function(id) {
   loadEvents()
 }
 
-// ══════════════════════════════════════════════════════
-//  SPILLERE
-// ══════════════════════════════════════════════════════
+// SPILLERE
 async function loadSpillere() {
   const { data, error } = await supabase.from('spillere').select('*').order('navn')
   if (error) { console.error(error); return }
@@ -227,9 +223,7 @@ window.deleteSpiller = async function(id) {
   loadSpillere()
 }
 
-// ══════════════════════════════════════════════════════
 //  UDSTYR
-// ══════════════════════════════════════════════════════
 async function loadUdstyr() {
   const { data, error } = await supabase.from('udstyr').select('*').order('navn')
   if (error) { console.error(error); return }
@@ -302,9 +296,7 @@ window.deleteUdstyr = async function(id) {
   loadUdstyr()
 }
 
-// ══════════════════════════════════════════════════════
 //  BRUGERE
-// ══════════════════════════════════════════════════════
 async function loadBrugere() {
   const { data, error } = await supabase
     .from('profiles')
