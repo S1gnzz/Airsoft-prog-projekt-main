@@ -459,7 +459,6 @@ async function loadUdstyr() {
   const { data, error } = await supabase
     .from('udstyr')
     .select('*')
-    .eq('lejet', false)
     .neq('tilstand', 'Defekt')
     .order('navn')
 
@@ -472,7 +471,17 @@ async function loadUdstyr() {
     return
   }
 
-  container.innerHTML = data.map(u => `
+  // Filtrer så kun udstyr med ledige stk vises
+  const tilgængeligt = data.filter(u => (u.antal || 1) - (u.antal_lejet || 0) > 0)
+
+  if (!tilgængeligt.length) {
+    container.innerHTML = '<div class="empty">INTET UDSTYR TILGÆNGELIGT I ØJEBLIKKET</div>'
+    return
+  }
+
+  container.innerHTML = tilgængeligt.map(u => {
+    const ledig = (u.antal || 1) - (u.antal_lejet || 0)
+    return `
     <div class="card">
       <div class="card-label">// ${(u.type || 'UDSTYR').toUpperCase()}</div>
       <div class="card-title">${u.navn}</div>
@@ -480,19 +489,22 @@ async function loadUdstyr() {
         <span class="badge badge-green">TILGÆNGELIGT</span>
         <span class="badge badge-dim">${u.tilstand}</span>
       </div>
+      <div class="card-meta" style="margin-top:6px; font-size:0.8rem">
+        ${ledig} ledig${ledig !== 1 ? 'e' : ''} tilbage
+      </div>
       <div class="card-footer">
-        <button class="btn" onclick="lejUdstyr(${u.id}, '${u.navn.replace(/'/g,"\\'")}')">
+        <button class="btn" onclick="lejUdstyr(${u.id}, '${u.navn.replace(/'/g,"\\'")}', ${u.antal_lejet || 0})">
           Lej dette
         </button>
       </div>
     </div>
-  `).join('')
+  `}).join('')
 }
 
-window.lejUdstyr = async function(id, navn) {
+window.lejUdstyr = async function(id, navn, antalLejet) {
   const { error } = await supabase
     .from('udstyr')
-    .update({ lejet: true, lejet_af: aktivtNavn })
+    .update({ antal_lejet: antalLejet + 1 })
     .eq('id', id)
 
   if (error) { toast('FEJL: ' + error.message); return }
