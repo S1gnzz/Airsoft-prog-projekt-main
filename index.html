@@ -30,7 +30,6 @@
       min-height: 100vh;
     }
 
-    /* Background grid texture */
     body::before {
       content: '';
       position: fixed;
@@ -43,7 +42,6 @@
       z-index: 0;
     }
 
-    /* ── NAV ── */
     nav {
       position: sticky;
       top: 0;
@@ -98,11 +96,9 @@
       padding: 2.5rem 2rem;
     }
 
-    /* ── PAGES ── */
     .page { display: none; }
     .page.active { display: block; }
 
-    /* ── PAGE HEADER ── */
     .page-header {
       display: flex;
       align-items: flex-end;
@@ -129,7 +125,6 @@
       margin-bottom: 4px;
     }
 
-    /* ── BUTTON ── */
     .btn {
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.8rem;
@@ -163,7 +158,6 @@
       font-size: 0.7rem;
     }
 
-    /* ── MODAL / FORM PANEL ── */
     .panel {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -230,7 +224,6 @@
       margin-top: 1.5rem;
     }
 
-    /* ── BANE SUGGESTION ── */
     .bane-suggestion {
       background: var(--surface2);
       border: 1px solid var(--accent-dim);
@@ -263,7 +256,6 @@
       margin-top: 2px;
     }
 
-    /* ── TABLE ── */
     .data-table {
       width: 100%;
       border-collapse: collapse;
@@ -291,7 +283,6 @@
       background: var(--surface2);
     }
 
-    /* ── BADGES ── */
     .badge {
       font-family: 'Share Tech Mono', monospace;
       font-size: 0.65rem;
@@ -305,7 +296,6 @@
     .badge-red   { color: var(--red);    border-color: #7a2020; }
     .badge-dim   { color: var(--text-dim); border-color: var(--border); }
 
-    /* ── STATS ROW ── */
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -343,7 +333,6 @@
       letter-spacing: 0.05em;
     }
 
-    /* ── SØGEBAR ── */
     .søge-række {
       display: flex;
       gap: 0.75rem;
@@ -379,7 +368,6 @@
 
     .søge-select:focus { border-color: var(--accent-dim); }
 
-    /* ── EMPTY STATE ── */
     .empty {
       text-align: center;
       padding: 4rem 2rem;
@@ -389,7 +377,6 @@
       letter-spacing: 0.2em;
     }
 
-    /* ── TOAST ── */
     #toast {
       position: fixed;
       bottom: 2rem;
@@ -429,9 +416,6 @@
 
 <main>
 
-  <!-- ══════════════════════════════
-       EVENTS PAGE
-  ══════════════════════════════ -->
   <div class="page active" id="page-events">
 
     <div class="page-header">
@@ -442,7 +426,6 @@
       <button class="btn" onclick="togglePanel('event-form')">+ Nyt Event</button>
     </div>
 
-    <!-- Create event form -->
     <div class="panel" id="event-form">
       <div class="panel-title">Opret Event</div>
       <div class="form-grid">
@@ -468,7 +451,6 @@
         </div>
       </div>
 
-      <!-- Bane suggestion -->
       <div class="bane-suggestion" id="bane-box">
         <div class="bane-label">// ANBEFALET BANE</div>
         <div class="bane-value" id="bane-name"></div>
@@ -481,7 +463,6 @@
       </div>
     </div>
 
-    <!-- Stats -->
     <div class="stats">
       <div class="stat-card">
         <div class="stat-label">Kommende events</div>
@@ -499,12 +480,10 @@
       </div>
     </div>
 
-    <!-- Søg i events -->
     <div class="søge-række">
       <input class="søge-input" id="events-søg" type="text" placeholder="// SØG EFTER TITEL, LOKATION, BANE..." oninput="filterEvents(this.value)">
     </div>
 
-    <!-- Events table -->
     <table class="data-table" id="events-table">
       <thead>
         <tr>
@@ -522,9 +501,6 @@
     </table>
   </div>
 
-  <!-- ══════════════════════════════
-       SPILLERE PAGE
-  ══════════════════════════════ -->
   <div class="page" id="page-spillere">
 
     <div class="page-header">
@@ -556,7 +532,6 @@
       </div>
     </div>
 
-    <!-- Søg + filtrer spillere -->
     <div class="søge-række">
       <input class="søge-input" id="spillere-søg" type="text" placeholder="// SØG EFTER NAVN..." oninput="filterSpillere()">
       <select class="søge-select" id="spillere-filter" onchange="filterSpillere()">
@@ -581,9 +556,6 @@
     </table>
   </div>
 
-  <!-- ══════════════════════════════
-       UDSTYR PAGE
-  ══════════════════════════════ -->
   <div class="page" id="page-udstyr">
 
     <div class="page-header">
@@ -632,7 +604,6 @@
       </div>
     </div>
 
-    <!-- Søg + filtrer udstyr -->
     <div class="søge-række">
       <input class="søge-input" id="udstyr-søg" type="text" placeholder="// SØG EFTER NAVN..." oninput="filterUdstyr()">
       <select class="søge-select" id="udstyr-filter" onchange="filterUdstyr()">
@@ -663,9 +634,6 @@
     </table>
   </div>
 
-  <!-- ══════════════════════════════
-       UDLEJNINGER PAGE
-  ══════════════════════════════ -->
   <div class="page" id="page-udlejninger">
 
     <div class="page-header">
