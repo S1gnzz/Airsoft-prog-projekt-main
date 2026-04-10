@@ -127,6 +127,91 @@ function toast(besked) {
   }, 2500)
 }
 
+// ══════════════════════════════════════════════════════
+//  LOKALE ARRAYS — data gemmes her efter hentning fra databasen.
+//  Søgning, filtrering og statistik arbejder på disse arrays
+//  uden at lave nye database-kald hver gang.
+// ══════════════════════════════════════════════════════
+let alleEvents   = []
+let alleSpillere = []
+let alleUdstyr   = []
+
+// ══════════════════════════════════════════════════════
+//  STATISTIK
+//
+//  Udregner nøgletal fra de lokale arrays og opdaterer
+//  dashboard-boksene. Kører automatisk efter hvert load.
+// ══════════════════════════════════════════════════════
+function opdaterStatistik() {
+  // ── Events: tæl kun fremtidige events ──
+  const idag = new Date()
+  idag.setHours(0, 0, 0, 0)
+  const kommendeEvents = alleEvents.filter(ev => new Date(ev.dato) >= idag)
+  document.getElementById('stat-events').textContent = kommendeEvents.length
+
+  // ── Spillere: vis antal + procent der er medlemmer ──
+  const antalSpillere  = alleSpillere.length
+  const antalMedlemmer = alleSpillere.filter(s => s.medlem === true).length
+  document.getElementById('stat-spillere').textContent = antalSpillere
+
+  const statSpillereSub = document.getElementById('stat-spillere-sub')
+  if (statSpillereSub) {
+    const pct = antalSpillere > 0 ? Math.round((antalMedlemmer / antalSpillere) * 100) : 0
+    statSpillereSub.textContent = antalMedlemmer + ' medlemmer (' + pct + '%)'
+  }
+
+  // ── Udstyr: tilgængeligt = samlet antal minus udlejet ──
+  const samletAntal  = alleUdstyr.reduce((sum, u) => sum + (u.antal || 1), 0)
+  const samletLejet  = alleUdstyr.reduce((sum, u) => sum + (u.antal_lejet || 0), 0)
+  const tilgængeligt = samletAntal - samletLejet
+  document.getElementById('stat-udstyr').textContent = tilgængeligt
+
+  const statUdstyrSub = document.getElementById('stat-udstyr-sub')
+  if (statUdstyrSub) {
+    statUdstyrSub.textContent = samletLejet + ' lejet ud · ' + samletAntal + ' i alt'
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  SØGNING & FILTRERING
+// ══════════════════════════════════════════════════════
+function filterEvents(søgeTekst) {
+  const tekst = søgeTekst.toLowerCase()
+  const filtrerede = alleEvents.filter(ev =>
+    (ev.titel    || '').toLowerCase().includes(tekst) ||
+    (ev.lokation || '').toLowerCase().includes(tekst) ||
+    (ev.bane     || '').toLowerCase().includes(tekst)
+  )
+  renderEvents(filtrerede)
+}
+
+function filterSpillere() {
+  const tekst  = document.getElementById('spillere-søg').value.toLowerCase()
+  const status = document.getElementById('spillere-filter').value
+  const filtrerede = alleSpillere.filter(s => {
+    const navnMatcher  = (s.navn || '').toLowerCase().includes(tekst)
+    let statusMatcher  = true
+    if (status === 'medlem')      statusMatcher = s.medlem === true
+    if (status === 'ikke-medlem') statusMatcher = s.medlem === false
+    return navnMatcher && statusMatcher
+  })
+  renderSpillere(filtrerede)
+}
+
+function filterUdstyr() {
+  const tekst = document.getElementById('udstyr-søg').value.toLowerCase()
+  const type  = document.getElementById('udstyr-filter').value
+  const filtrerede = alleUdstyr.filter(u => {
+    const navnMatcher = (u.navn || '').toLowerCase().includes(tekst)
+    const typeMatcher = type === 'alle' || u.type === type
+    return navnMatcher && typeMatcher
+  })
+  renderUdstyr(filtrerede)
+}
+
+window.filterEvents   = filterEvents
+window.filterSpillere = filterSpillere
+window.filterUdstyr   = filterUdstyr
 
 // ══════════════════════════════════════════════════════
 //  EVENTS
@@ -134,47 +219,32 @@ function toast(besked) {
 
 // Hent alle events fra databasen og vis dem i tabellen
 async function loadEvents() {
-  const { data, error } = await supabase
-    .from('events')
-    .select('*')
-    .order('dato')
+  const { data, error } = await supabase.from('events').select('*').order('dato')
+  if (error) { console.error(error); return }
 
-  if (error) {
-    console.error(error)
-    return
-  }
-
-  // Opdater statistik-tæller
   document.getElementById('stat-events').textContent = data.length
 
-  var tbody = document.getElementById('events-body')
-
-  // Vis besked hvis der ingen events er
-  if (data.length === 0) {
+  const tbody = document.getElementById('events-body')
+  if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty">INGEN EVENTS OPRETTET</td></tr>'
     return
   }
 
-  // Byg HTML for hver event og indsæt i tabellen
-  var html = ''
-  var i = 0
-  while (i < data.length) {
-    var ev = data[i]
-    var dato = '—'
-    if (ev.dato) {
-      dato = new Date(ev.dato).toLocaleDateString('da-DK')
-    }
-    html += '<tr>'
-    html += '<td><strong>' + (ev.titel || '—') + '</strong></td>'
-    html += '<td>' + dato + '</td>'
-    html += '<td>' + (ev.lokation || '—') + '</td>'
-    html += '<td>' + (ev.antal_spillere || '—') + '</td>'
-    html += '<td>' + (ev.bane || '—') + '</td>'
-    html += '<td><button class="btn btn-sm btn-danger" onclick="deleteEvent(' + ev.id + ')">Slet</button></td>'
-    html += '</tr>'
-    i++
-  }
-  tbody.innerHTML = html
+  tbody.innerHTML = data.map(ev => {
+    const dato = ev.dato ? new Date(ev.dato).toLocaleDateString('da-DK') : '—'
+    return `
+      <tr>
+        <td><strong>${ev.titel || '—'}</strong></td>
+        <td>${dato}</td>
+        <td>${ev.lokation || '—'}</td>
+        <td>${ev.antal_spillere || '—'}</td>
+        <td>${ev.bane || '—'}</td>
+        <td>
+          <button class="btn btn-sm btn-danger" onclick="deleteEvent(${ev.id})">Slet</button>
+        </td>
+      </tr>
+    `
+  }).join('')
 }
 
 // Gem et nyt event i databasen
@@ -185,28 +255,10 @@ window.gemEvent = async function() {
   var antal       = parseInt(document.getElementById('e-spillere').value)
   var beskrivelse = document.getElementById('e-beskrivelse').value.trim()
 
-  // Validering — tjek at titel og dato er udfyldt
-  if (titel === '' || dato === '') {
-    toast('FEJL: Udfyld titel og dato')
-    return
-  }
+  if (!titel || !dato) { toast('FEJL: Udfyld titel og dato'); return }
 
-  // Validering — dato må ikke være i fortiden
-  var valgtDato = new Date(dato)
-  var idag = new Date()
-  idag.setHours(0, 0, 0, 0)
-  if (valgtDato < idag) {
-    toast('FEJL: Dato kan ikke være i fortiden')
-    return
-  }
+  const bane = antal ? getBane(antal).navn : null
 
-  // Find anbefalet bane ud fra antal spillere
-  var bane = null
-  if (antal) {
-    bane = getBane(antal).navn
-  }
-
-  // Indsæt event i databasen
   const { error } = await supabase.from('events').insert({
     titel: titel,
     dato: dato,
@@ -216,10 +268,7 @@ window.gemEvent = async function() {
     bane: bane
   })
 
-  if (error) {
-    toast('FEJL: ' + error.message)
-    return
-  }
+  if (error) { toast('FEJL: ' + error.message); return }
 
   toast('✓ EVENT OPRETTET')
   togglePanel('event-form')
@@ -257,99 +306,53 @@ window.deleteEvent = async function(id) {
 
 // Hent alle spillere fra databasen og vis dem i tabellen
 async function loadSpillere() {
-  const { data, error } = await supabase
-    .from('spillere')
-    .select('*')
-    .order('navn')
-
-  if (error) {
-    console.error(error)
-    return
-  }
+  const { data, error } = await supabase.from('spillere').select('*').order('navn')
+  if (error) { console.error(error); return }
 
   document.getElementById('stat-spillere').textContent = data.length
 
-  var tbody = document.getElementById('spillere-body')
-
-  if (data.length === 0) {
+  const tbody = document.getElementById('spillere-body')
+  if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="empty">INGEN SPILLERE REGISTRERET</td></tr>'
     return
   }
 
-  var html = ''
-  var i = 0
-  while (i < data.length) {
-    var s = data[i]
-
-    // Sæt badge-farve for medlemskab
-    var medlemBadge = 'badge-dim'
-    var medlemTekst = 'IKKE-MEDLEM'
-    if (s.medlem) {
-      medlemBadge = 'badge-green'
-      medlemTekst = 'MEDLEM'
-    }
-
-    // Sæt badge for ansøgning
-    var ansøgtBadge = ''
-    if (s.ansøgt && !s.medlem) {
-      ansøgtBadge = '<span class="badge badge-red" style="margin-left:6px">ANSØGT</span>'
-    }
-
-    // Sæt badge-farve for tilmelding
-    var tilmeldtBadge = 'badge-dim'
-    var tilmeldtTekst = 'IKKE TILMELDT'
-    if (s.tilmeldt) {
-      tilmeldtBadge = 'badge-green'
-      tilmeldtTekst = 'TILMELDT'
-    }
-
-    // Godkend-knap vises kun hvis spilleren har ansøgt
-    var godkendKnap = ''
-    if (s.ansøgt && !s.medlem) {
-      godkendKnap = '<button class="btn btn-sm" onclick="godkendMedlem(' + s.id + ')">Godkend</button>'
-    }
-
-    // Tekst på tilmeld-knap afhænger af nuværende status
-    var tilmeldKnapTekst = 'Tilmeld'
-    if (s.tilmeldt) {
-      tilmeldKnapTekst = 'Frameld'
-    }
-
-    html += '<tr>'
-    html += '<td><strong>' + s.navn + '</strong></td>'
-    html += '<td><span class="badge ' + medlemBadge + '">' + medlemTekst + '</span>' + ansøgtBadge + '</td>'
-    html += '<td><span class="badge ' + tilmeldtBadge + '">' + tilmeldtTekst + '</span></td>'
-    html += '<td>'
-    html += godkendKnap
-    html += '<button class="btn btn-sm" onclick="toggleTilmeldt(' + s.id + ', ' + s.tilmeldt + ')">' + tilmeldKnapTekst + '</button>'
-    html += '<button class="btn btn-sm btn-danger" onclick="deleteSpiller(' + s.id + ')">Slet</button>'
-    html += '</td>'
-    html += '</tr>'
-    i++
-  }
-  tbody.innerHTML = html
+  tbody.innerHTML = data.map(s => `
+  <tr>
+    <td><strong>${s.navn}</strong></td>
+    <td>
+      <span class="badge ${s.medlem ? 'badge-green' : 'badge-dim'}">
+        ${s.medlem ? 'MEDLEM' : 'IKKE-MEDLEM'}
+      </span>
+      ${s.ansøgt && !s.medlem ? '<span class="badge badge-red" style="margin-left:6px">ANSØGT</span>' : ''}
+    </td>
+    <td>
+      <span class="badge ${s.tilmeldt ? 'badge-green' : 'badge-dim'}">
+        ${s.tilmeldt ? 'TILMELDT' : 'IKKE TILMELDT'}
+      </span>
+    </td>
+    <td>
+      ${s.ansøgt && !s.medlem
+        ? `<button class="btn btn-sm" onclick="godkendMedlem(${s.id})">Godkend</button>`
+        : ''
+      }
+      <button class="btn btn-sm" onclick="toggleTilmeldt(${s.id}, ${s.tilmeldt})">
+        ${s.tilmeldt ? 'Frameld' : 'Tilmeld'}
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="deleteSpiller(${s.id})">Slet</button>
+    </td>
+  </tr>
+`).join('')
 }
 
-// Gem en ny spiller i databasen
 window.gemSpiller = async function() {
-  var navn   = document.getElementById('s-navn').value.trim()
-  var medlem = document.getElementById('s-medlem').value === 'true'
+  const navn   = document.getElementById('s-navn').value.trim()
+  const medlem = document.getElementById('s-medlem').value === 'true'
 
-  if (navn === '') {
-    toast('FEJL: Indtast et navn')
-    return
-  }
+  if (!navn) { toast('FEJL: Indtast et navn'); return }
 
-  const { error } = await supabase.from('spillere').insert({
-    navn: navn,
-    medlem: medlem,
-    tilmeldt: false
-  })
-
-  if (error) {
-    toast('FEJL: ' + error.message)
-    return
-  }
+  const { error } = await supabase.from('spillere').insert({ navn, medlem, tilmeldt: false })
+  if (error) { toast('FEJL: ' + error.message); return }
 
   toast('✓ SPILLER TILFØJET')
   togglePanel('spiller-form')
@@ -385,12 +388,7 @@ window.godkendMedlem = async function(id) {
     .from('spillere')
     .update({ medlem: true, ansøgt: false })
     .eq('id', id)
-
-  if (error) {
-    toast('FEJL: ' + error.message)
-    return
-  }
-
+  if (error) { toast('FEJL: ' + error.message); return }
   toast('✓ MEDLEMSKAB GODKENDT')
   loadSpillere()
 }
@@ -413,124 +411,48 @@ window.deleteSpiller = async function(id) {
 
 // ══════════════════════════════════════════════════════
 //  UDSTYR
+//
+//  Hvert udstyr har et samlet antal og antal_lejet.
+//  Tilgængeligt = antal - antal_lejet
+//  Admin justerer antal med + og − knapper direkte i tabellen.
 // ══════════════════════════════════════════════════════
 
 // Hent alt udstyr fra databasen og vis det i tabellen
 async function loadUdstyr() {
-  const { data, error } = await supabase
-    .from('udstyr')
-    .select('*')
-    .order('navn')
-
-  if (error) {
-    console.error(error)
-    return
-  }
+  const { data, error } = await supabase.from('udstyr').select('*').order('navn')
+  if (error) { console.error(error); return }
 
   document.getElementById('stat-udstyr').textContent = data.length
 
-  var tbody = document.getElementById('udstyr-body')
-
-  if (data.length === 0) {
+  const tbody = document.getElementById('udstyr-body')
+  if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty">INGEN UDSTYR REGISTRERET</td></tr>'
     return
   }
 
-  var html = ''
-  var i = 0
-  while (i < data.length) {
-    var u = data[i]
-    var samlet      = u.antal || 1
-    var lejet       = u.antal_lejet || 0
-    var tilgængelig = samlet - lejet
-
-    // Vis rød badge hvis alt er udlejet, grøn ellers
-    var statusBadge = ''
-    if (tilgængelig <= 0) {
-      statusBadge = '<span class="badge badge-red">UDLEJET</span>'
-    } else {
-      statusBadge = '<span class="badge badge-green">TILGÆNGELIGT</span>'
-    }
-
-    // Vis farvet badge for tilstand
-    var tilstandFarve = 'badge-dim'
-    if (u.tilstand === 'Defekt') tilstandFarve = 'badge-red'
-    if (u.tilstand === 'God')    tilstandFarve = 'badge-green'
-
-    // Deaktiver knapper hvis der ikke er noget at udleje/returnere
-    var udlejDisabled = ''
-    var returnerDisabled = ''
-    var minusDisabled = ''
-    if (tilgængelig <= 0) udlejDisabled    = 'disabled'
-    if (lejet <= 0)       returnerDisabled = 'disabled'
-    if (samlet <= 1)      minusDisabled    = 'disabled'
-
-    html += '<tr>'
-    html += '<td><strong>' + u.navn + '</strong></td>'
-    html += '<td><span class="badge badge-dim">' + (u.type || '—') + '</span></td>'
-    html += '<td>' + statusBadge + '</td>'
-    html += '<td><span class="badge ' + tilstandFarve + '">' + (u.tilstand || '—') + '</span></td>'
-    html += '<td>'
-    html += '<button class="btn btn-sm" onclick="justerAntal(' + u.id + ', ' + lejet + ', ' + samlet + ', -1)" ' + minusDisabled + '>−</button>'
-    html += ' ' + tilgængelig + '/' + samlet + ' '
-    html += '<button class="btn btn-sm" onclick="justerAntal(' + u.id + ', ' + lejet + ', ' + samlet + ', +1)">+</button>'
-    html += '</td>'
-    html += '<td>'
-    html += '<button class="btn btn-sm" onclick="udlejEt(' + u.id + ', ' + lejet + ', ' + samlet + ')" ' + udlejDisabled + '>Udlej</button>'
-    html += '<button class="btn btn-sm" onclick="returnerEt(' + u.id + ', ' + lejet + ')" ' + returnerDisabled + '>Returner</button>'
-    html += '<button class="btn btn-sm btn-danger" onclick="deleteUdstyr(' + u.id + ')">Slet</button>'
-    html += '</td>'
-    html += '</tr>'
-    i++
-  }
-  tbody.innerHTML = html
-}
-
-// Juster det samlede antal styk op eller ned
-window.justerAntal = async function(id, antalLejet, nuværendeAntal, retning) {
-  var nytAntal = nuværendeAntal + retning
-
-  if (nytAntal < antalLejet) {
-    toast('FEJL: Kan ikke sætte under antal udlejet (' + antalLejet + ')')
-    return
-  }
-  if (nytAntal < 1) {
-    toast('FEJL: Antal kan ikke være under 1')
-    return
-  }
-
-  const { error } = await supabase
-    .from('udstyr')
-    .update({ antal: nytAntal })
-    .eq('id', id)
-
-  if (error) {
-    toast('FEJL: ' + error.message)
-    return
-  }
-
-  loadUdstyr()
-}
-
-// Udlej ét styk udstyr
-window.udlejEt = async function(id, antalLejet, samlet) {
-  if (antalLejet >= samlet) {
-    toast('FEJL: Ingen ledige tilbage')
-    return
-  }
-
-  const { error } = await supabase
-    .from('udstyr')
-    .update({ antal_lejet: antalLejet + 1 })
-    .eq('id', id)
-
-  if (error) {
-    toast('FEJL: ' + error.message)
-    return
-  }
-
-  toast('✓ UDLEJET')
-  loadUdstyr()
+  tbody.innerHTML = data.map(u => `
+    <tr>
+      <td><strong>${u.navn}</strong></td>
+      <td><span class="badge badge-dim">${u.type || '—'}</span></td>
+      <td>
+        <span class="badge ${u.lejet ? 'badge-red' : 'badge-green'}">
+          ${u.lejet ? 'LEJET UD' : 'TILGÆNGELIGT'}
+        </span>
+      </td>
+      <td>
+        <span class="badge ${u.tilstand === 'Defekt' ? 'badge-red' : u.tilstand === 'God' ? 'badge-green' : 'badge-dim'}">
+          ${u.tilstand || '—'}
+        </span>
+      </td>
+      <td>${u.lejet_af ? u.lejet_af : '—'}</td>
+      <td>
+        <button class="btn btn-sm" onclick="toggleLejet(${u.id}, ${u.lejet})">
+          ${u.lejet ? 'Returner' : 'Udlej'}
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="deleteUdstyr(${u.id})">Slet</button>
+      </td>
+    </tr>
+  `).join('')
 }
 
 // Returner ét styk udstyr
@@ -556,32 +478,15 @@ window.returnerEt = async function(id, antalLejet) {
 
 // Gem nyt udstyr i databasen
 window.gemUdstyr = async function() {
-  var navn     = document.getElementById('u-navn').value.trim()
-  var type     = document.getElementById('u-type').value
-  var antal    = parseInt(document.getElementById('u-antal').value) || 1
-  var tilstand = document.getElementById('u-tilstand').value
+  const navn     = document.getElementById('u-navn').value.trim()
+  const type     = document.getElementById('u-type').value
+  const lejet    = document.getElementById('u-lejet').value === 'true'
+  const tilstand = document.getElementById('u-tilstand').value
 
-  if (navn === '') {
-    toast('FEJL: Indtast et navn')
-    return
-  }
-  if (antal < 1) {
-    toast('FEJL: Antal skal være mindst 1')
-    return
-  }
+  if (!navn) { toast('FEJL: Indtast et navn'); return }
 
-  const { error } = await supabase.from('udstyr').insert({
-    navn: navn,
-    type: type,
-    tilstand: tilstand,
-    antal: antal,
-    antal_lejet: 0
-  })
-
-  if (error) {
-    toast('FEJL: ' + error.message)
-    return
-  }
+  const { error } = await supabase.from('udstyr').insert({ navn, type, lejet, tilstand })
+  if (error) { toast('FEJL: ' + error.message); return }
 
   toast('✓ UDSTYR TILFØJET')
   togglePanel('udstyr-form')
@@ -589,7 +494,16 @@ window.gemUdstyr = async function() {
   loadUdstyr()
 }
 
-// Slet udstyr fra databasen
+window.toggleLejet = async function(id, nuværende) {
+  const opdatering = nuværende
+    ? { lejet: false, lejet_af: null }
+    : { lejet: true }
+  const { error } = await supabase.from('udstyr').update(opdatering).eq('id', id)
+  if (error) { toast('FEJL: ' + error.message); return }
+  toast(nuværende ? '✓ RETURNERET' : '✓ UDLEJET')
+  loadUdstyr()
+}
+
 window.deleteUdstyr = async function(id) {
   if (!confirm('Slet dette udstyr?')) return
 
@@ -606,52 +520,6 @@ window.deleteUdstyr = async function(id) {
 
 
 // ══════════════════════════════════════════════════════
-//  UDLEJNINGER
-// ══════════════════════════════════════════════════════
-
-// Hent kun udstyr der er udlejet og vis i tabellen
-async function loadUdlejninger() {
-  const { data, error } = await supabase
-    .from('udstyr')
-    .select('*')
-    .gt('antal_lejet', 0)
-    .order('navn')
-
-  if (error) {
-    console.error(error)
-    return
-  }
-
-  var tbody = document.getElementById('udlejninger-body')
-
-  if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">INTET UDSTYR ER AKTUELT LEJET UD</td></tr>'
-    return
-  }
-
-  var html = ''
-  var i = 0
-  while (i < data.length) {
-    var u = data[i]
-    var tilstandFarve = 'badge-dim'
-    if (u.tilstand === 'Defekt') tilstandFarve = 'badge-red'
-    if (u.tilstand === 'God')    tilstandFarve = 'badge-green'
-
-    html += '<tr>'
-    html += '<td><strong>' + u.navn + '</strong></td>'
-    html += '<td><span class="badge badge-dim">' + (u.type || '—') + '</span></td>'
-    html += '<td>' + (u.lejet_af || '—') + '</td>'
-    html += '<td><span class="badge badge-red">' + u.antal_lejet + ' lejet ud</span></td>'
-    html += '<td><span class="badge ' + tilstandFarve + '">' + (u.tilstand || '—') + '</span></td>'
-    html += '<td><button class="btn btn-sm" onclick="returnerEt(' + u.id + ', ' + u.antal_lejet + '); loadUdlejninger()">Returner én</button></td>'
-    html += '</tr>'
-    i++
-  }
-  tbody.innerHTML = html
-}
-
-
-// ══════════════════════════════════════════════════════
 //  BRUGERE
 // ══════════════════════════════════════════════════════
 
@@ -662,43 +530,31 @@ async function loadBrugere() {
     .select('*')
     .order('navn')
 
-  if (error) {
-    console.error(error)
-    return
-  }
+  if (error) { console.error(error); return }
 
-  var tbody = document.getElementById('brugere-body')
-
-  if (data.length === 0) {
+  const tbody = document.getElementById('brugere-body')
+  if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="empty">INGEN BRUGERE REGISTRERET</td></tr>'
     return
   }
 
-  var html = ''
-  var i = 0
-  while (i < data.length) {
-    var b = data[i]
-
-    var rolleFarve = 'badge-dim'
-    if (b.rolle === 'admin') rolleFarve = 'badge-green'
-
-    var rolle = b.rolle || 'kunde'
-
-    // Vis kun "Gør admin"-knap hvis brugeren ikke allerede er admin
-    var adminKnap = '—'
-    if (b.rolle !== 'admin') {
-      adminKnap = '<button class="btn btn-sm" onclick="gørAdmin(\'' + b.id + '\')">Gør admin</button>'
-    }
-
-    html += '<tr>'
-    html += '<td><strong>' + (b.navn || '—') + '</strong></td>'
-    html += '<td style="font-size:0.75rem; color:var(--text-dim)">' + b.id + '</td>'
-    html += '<td><span class="badge ' + rolleFarve + '">' + rolle.toUpperCase() + '</span></td>'
-    html += '<td>' + adminKnap + '</td>'
-    html += '</tr>'
-    i++
-  }
-  tbody.innerHTML = html
+  tbody.innerHTML = data.map(b => `
+    <tr>
+      <td><strong>${b.navn || '—'}</strong></td>
+      <td style="font-size:0.75rem; color:var(--text-dim)">${b.id}</td>
+      <td>
+        <span class="badge ${b.rolle === 'admin' ? 'badge-green' : 'badge-dim'}">
+          ${(b.rolle || 'kunde').toUpperCase()}
+        </span>
+      </td>
+      <td>
+        ${b.rolle !== 'admin'
+          ? `<button class="btn btn-sm" onclick="gørAdmin('${b.id}')">Gør admin</button>`
+          : '—'
+        }
+      </td>
+    </tr>
+  `).join('')
 }
 
 // Giv en bruger admin-rolle
@@ -724,3 +580,69 @@ window.gørAdmin = async function(id) {
 loadEvents()
 loadSpillere()
 loadUdstyr()
+
+// ══════════════════════════════════════════════════════
+//  UDLEJNINGER
+//
+//  Viser en oversigt over alt udstyr der aktuelt er lejet ud,
+//  inkl. hvem der har lejet det. Admin kan returnere herfra.
+// ══════════════════════════════════════════════════════
+async function loadUdlejninger() {
+  // Hent alle rækker fra udlejninger-tabellen — én række per person per udstyr
+  const { data, error } = await supabase
+    .from('udlejninger')
+    .select('*')
+    .order('dato', { ascending: false })
+
+  if (error) { console.error(error); return }
+
+  const tbody = document.getElementById('udlejninger-body')
+
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">INTET UDSTYR ER AKTUELT LEJET UD</td></tr>'
+    return
+  }
+
+  tbody.innerHTML = data.map(l => {
+    const dato = new Date(l.dato).toLocaleDateString('da-DK', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+    return `
+      <tr>
+        <td><strong>${l.udstyr_navn}</strong></td>
+        <td><span class="badge badge-red">LEJET UD</span></td>
+        <td>${l.bruger_navn || '—'}</td>
+        <td style="font-size:0.78rem; color:var(--text-dim)">${dato}</td>
+        <td>
+          <button class="btn btn-sm" onclick="adminReturner(${l.udstyr_id}, ${l.id})">
+            Returner
+          </button>
+        </td>
+      </tr>
+    `
+  }).join('')
+}
+
+// Admin returnerer udstyr på vegne af en bruger
+window.adminReturner = async function(udstyrId, udlejningId) {
+  // Hent nuværende antal_lejet
+  const { data: udstyr } = await supabase
+    .from('udstyr')
+    .select('antal_lejet')
+    .eq('id', udstyrId)
+    .single()
+
+  // Sænk antal_lejet med 1
+  await supabase
+    .from('udstyr')
+    .update({ antal_lejet: Math.max(0, (udstyr?.antal_lejet || 1) - 1) })
+    .eq('id', udstyrId)
+
+  // Slet lejemålet fra udlejninger-tabellen
+  await supabase.from('udlejninger').delete().eq('id', udlejningId)
+
+  toast('✓ RETURNERET')
+  loadUdlejninger()
+  loadUdstyr()
+}

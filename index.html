@@ -336,6 +336,50 @@
       line-height: 1;
     }
 
+    .stat-card .stat-sub {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── SØGEBAR ── */
+    .søge-række {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+
+    .søge-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-bright);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.85rem;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .søge-input:focus { border-color: var(--accent-dim); }
+    .søge-input::placeholder { color: var(--text-dim); }
+
+    .søge-select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.75rem;
+      padding: 9px 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .søge-select:focus { border-color: var(--accent-dim); }
+
     /* ── EMPTY STATE ── */
     .empty {
       text-align: center;
@@ -378,6 +422,7 @@
   <a href="#" class="active" data-page="events">Events</a>
   <a href="#" data-page="spillere">Spillere</a>
   <a href="#" data-page="udstyr">Udstyr</a>
+  <a href="#" data-page="udlejninger">Udlejninger</a>
   <a href="#" data-page="brugere">Brugere</a>
   <span id="nav-bruger" style="font-family:'Share Tech Mono',monospace;font-size:0.7rem;color:var(--text-dim);margin-left:auto"></span>
   <button class="btn" style="padding:6px 14px;font-size:0.7rem" onclick="logUd()">Log ud</button>
@@ -446,11 +491,18 @@
       <div class="stat-card">
         <div class="stat-label">Registrerede spillere</div>
         <div class="stat-value" id="stat-spillere">—</div>
+        <div class="stat-sub" id="stat-spillere-sub"></div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Udstyr på lager</div>
+        <div class="stat-label">Udstyr tilgængeligt</div>
         <div class="stat-value" id="stat-udstyr">—</div>
+        <div class="stat-sub" id="stat-udstyr-sub"></div>
       </div>
+    </div>
+
+    <!-- Søg i events -->
+    <div class="søge-række">
+      <input class="søge-input" id="events-søg" type="text" placeholder="// SØG EFTER TITEL, LOKATION, BANE..." oninput="filterEvents(this.value)">
     </div>
 
     <!-- Events table -->
@@ -500,9 +552,19 @@
         </div>
       </div>
       <div class="form-actions">
-        <button class="btn" onclick="createSpiller()">Gem Spiller</button>
+        <button class="btn" onclick="gemSpiller()">Gem Spiller</button>
         <button class="btn btn-danger" onclick="togglePanel('spiller-form')">Annuller</button>
       </div>
+    </div>
+
+    <!-- Søg + filtrer spillere -->
+    <div class="søge-række">
+      <input class="søge-input" id="spillere-søg" type="text" placeholder="// SØG EFTER NAVN..." oninput="filterSpillere()">
+      <select class="søge-select" id="spillere-filter" onchange="filterSpillere()">
+        <option value="alle">Alle</option>
+        <option value="medlem">Kun medlemmer</option>
+        <option value="ikke-medlem">Kun ikke-medlemmer</option>
+      </select>
     </div>
 
     <table class="data-table">
@@ -552,11 +614,8 @@
           </select>
         </div>
         <div class="field">
-          <label>Udlejningsstatus</label>
-          <select id="u-lejet">
-            <option value="false">Ulejet</option>
-            <option value="true">Lejet ud</option>
-          </select>
+          <label>Antal</label>
+          <input type="number" id="u-antal" min="1" value="1" placeholder="1">
         </div>
         <div class="field">
           <label>Tilstand</label>
@@ -574,6 +633,20 @@
       </div>
     </div>
 
+    <!-- Søg + filtrer udstyr -->
+    <div class="søge-række">
+      <input class="søge-input" id="udstyr-søg" type="text" placeholder="// SØG EFTER NAVN..." oninput="filterUdstyr()">
+      <select class="søge-select" id="udstyr-filter" onchange="filterUdstyr()">
+        <option value="alle">Alle typer</option>
+        <option value="Rifle">Rifle</option>
+        <option value="Pistol">Pistol</option>
+        <option value="Sniper">Sniper</option>
+        <option value="Support">Support</option>
+        <option value="Gear">Gear</option>
+        <option value="Andet">Andet</option>
+      </select>
+    </div>
+
     <table class="data-table">
       <thead>
         <tr>
@@ -581,10 +654,39 @@
           <th>Type</th>
           <th>Status</th>
           <th>Tilstand</th>
+          <th>Antal (ledig/total)</th>
           <th></th>
         </tr>
       </thead>
       <tbody id="udstyr-body">
+        <tr><td colspan="6" class="empty">LOADER DATA...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════
+       UDLEJNINGER PAGE
+  ══════════════════════════════ -->
+  <div class="page" id="page-udlejninger">
+
+    <div class="page-header">
+      <div class="page-title">
+        <span>// AKTIVT UDLEJET</span>
+        Udlejninger
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Udstyr</th>
+          <th>Status</th>
+          <th>Lejet af</th>
+          <th>Dato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="udlejninger-body">
         <tr><td colspan="5" class="empty">LOADER DATA...</td></tr>
       </tbody>
     </table>
